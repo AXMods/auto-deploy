@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vercel Auto Deploy — Upload HTML & Deploy</title>
+  <style>
+    :root{
+      --bg:#080708;
+      --card:#0f0f10;
+      --accent:#0070f3;
+      --muted:#9ca3af;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+    body{
+      background:var(--bg);
+      color:#e6e7e8;
+      min-height:100vh;
+      padding:20px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .container{
+      width:100%;
+      max-width:500px;
+      background:var(--card);
+      border-radius:20px;
+      padding:25px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.5);
+      border:1px solid rgba(255,255,255,0.05);
+    }
+    .logo{
+      text-align:center;
+      margin-bottom:25px;
+    }
+    .logo h1{
+      font-size:24px;
+      margin-bottom:5px;
+      background:linear-gradient(90deg,#0070f3,#00d4ff);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+    }
+    .logo p{
+      color:var(--muted);
+      font-size:14px;
+    }
+    .upload-area{
+      border:3px dashed rgba(0,112,243,0.3);
+      border-radius:15px;
+      padding:40px 20px;
+      text-align:center;
+      margin-bottom:20px;
+      cursor:pointer;
+      transition:all 0.3s;
+      background:rgba(0,112,243,0.05);
+    }
+    .upload-area:hover{
+      background:rgba(0,112,243,0.1);
+      border-color:rgba(0,112,243,0.5);
+    }
+    .upload-area.drag-over{
+      background:rgba(0,112,243,0.15);
+      transform:scale(1.02);
+    }
+    .upload-icon{
+      font-size:48px;
+      margin-bottom:15px;
+      color:#0070f3;
+    }
+    .btn{
+      width:100%;
+      padding:15px;
+      background:linear-gradient(90deg,#0070f3,#00d4ff);
+      color:white;
+      border:none;
+      border-radius:10px;
+      font-size:16px;
+      font-weight:600;
+      cursor:pointer;
+      margin-top:15px;
+      transition:transform 0.2s;
+    }
+    .btn:hover{
+      transform:translateY(-2px);
+    }
+    .btn:disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+    }
+    .result{
+      margin-top:20px;
+      padding:15px;
+      background:rgba(255,255,255,0.03);
+      border-radius:10px;
+      display:none;
+    }
+    .success{color:#10b981;}
+    .error{color:#ef4444;}
+    .url-box{
+      background:rgba(0,0,0,0.3);
+      padding:10px;
+      border-radius:8px;
+      margin-top:10px;
+      word-break:break-all;
+      font-family:monospace;
+      font-size:14px;
+    }
+    .action-buttons{
+      display:flex;
+      gap:10px;
+      margin-top:10px;
+    }
+    .action-buttons button{
+      flex:1;
+      padding:8px;
+      border-radius:6px;
+      border:1px solid rgba(255,255,255,0.1);
+      background:rgba(255,255,255,0.05);
+      color:white;
+      cursor:pointer;
+    }
+    .info{
+      margin-top:20px;
+      padding:15px;
+      background:rgba(255,255,255,0.02);
+      border-radius:10px;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .info ul{
+      margin-left:20px;
+      margin-top:10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <h1>🚀 Vercel Auto Deploy</h1>
+      <p>Upload HTML → Dapat URL Live Instan</p>
+    </div>
+
+    <div class="upload-area" id="dropZone">
+      <div class="upload-icon">📁</div>
+      <h3 id="dropText">Klik atau tarik file HTML kesini</h3>
+      <p style="color:var(--muted);margin-top:10px;font-size:14px">
+        Hanya file .html • Maks 5MB
+      </p>
+      <input type="file" id="fileInput" accept=".html" style="display:none">
+    </div>
+
+    <button class="btn" id="deployBtn" disabled>📤 Deploy ke Vercel</button>
+
+    <div class="result" id="resultBox">
+      <h3 id="resultTitle"></h3>
+      <p id="resultMessage"></p>
+      <div class="url-box" id="urlContainer" style="display:none">
+        <span id="urlText"></span>
+      </div>
+      <div class="action-buttons" id="actionButtons" style="display:none">
+        <button onclick="openURL()">🌐 Buka</button>
+        <button onclick="copyURL()">📋 Salin URL</button>
+      </div>
+    </div>
+
+    <div class="info">
+      <strong>ℹ️ Cara pakai:</strong>
+      <ul>
+        <li>Upload file HTML (biasanya index.html)</li>
+        <li>Klik "Deploy ke Vercel"</li>
+        <li>Tunggu 10-30 detik hingga URL muncul</li>
+        <li>Website langsung online!</li>
+      </ul>
+      <p style="margin-top:10px;">
+        <small>Powered by Vercel • Gratis • Auto delete setelah 30 hari</small>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Element
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const deployBtn = document.getElementById('deployBtn');
+    const resultBox = document.getElementById('resultBox');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
+    const urlContainer = document.getElementById('urlContainer');
+    const urlText = document.getElementById('urlText');
+    const actionButtons = document.getElementById('actionButtons');
+    const dropText = document.getElementById('dropText');
+
+    let selectedFile = null;
+    let deploymentURL = '';
+
+    // Drag & Drop
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', (e) => {
+      if(e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(file) {
+      if(!file.name.endsWith('.html')) {
+        showResult('error', 'File harus HTML', 'Hanya file .html yang didukung');
+        return;
+      }
+      
+      if(file.size > 5 * 1024 * 1024) {
+        showResult('error', 'File terlalu besar', 'Maksimal 5MB');
+        return;
+      }
+
+      selectedFile = file;
+      dropText.textContent = `📄 ${file.name}`;
+      deployBtn.disabled = false;
+      deployBtn.textContent = `📤 Deploy "${file.name}"`;
+      hideResult();
+    }
+
+    // Deploy
+    deployBtn.addEventListener('click', async () => {
+      if(!selectedFile) return;
+
+      deployBtn.disabled = true;
+      deployBtn.textContent = '⏳ Deploying...';
+      showResult('loading', 'Sedang mendeploy...', 'Tunggu 10-30 detik...');
+
+      try {
+        const formData = new FormData();
+        formData.append('html', selectedFile);
+
+        // Kirim ke backend Vercel kita
+        const response = await fetch('/api/deploy', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if(data.success) {
+          deploymentURL = data.url;
+          showResult('success', '✅ Deploy Berhasil!', 
+            `Website kamu sekarang live di:`,
+            data.url
+          );
+        } else {
+          throw new Error(data.error || 'Deploy gagal');
+        }
+      } catch(error) {
+        showResult('error', '❌ Deploy Gagal', error.message);
+      } finally {
+        deployBtn.disabled = false;
+        deployBtn.textContent = '📤 Deploy ke Vercel';
+      }
+    });
+
+    // Result handling
+    function showResult(type, title, message, url = null) {
+      resultBox.style.display = 'block';
+      resultBox.className = `result ${type}`;
+      resultTitle.textContent = title;
+      resultMessage.textContent = message;
+      
+      if(url) {
+        urlContainer.style.display = 'block';
+        urlText.textContent = url;
+        actionButtons.style.display = 'flex';
+      } else {
+        urlContainer.style.display = 'none';
+        actionButtons.style.display = 'none';
+      }
+    }
+
+    function hideResult() {
+      resultBox.style.display = 'none';
+    }
+
+    // URL actions
+    function openURL() {
+      if(deploymentURL) window.open(deploymentURL, '_blank');
+    }
+
+    function copyURL() {
+      if(deploymentURL) {
+        navigator.clipboard.writeText(deploymentURL);
+        alert('✅ URL disalin!');
+      }
+    }
+
+    // Auto close result setelah 30 detik jika sukses
+    setInterval(() => {
+      if(resultBox.style.display === 'block' && 
+         resultBox.classList.contains('success')) {
+        hideResult();
+      }
+    }, 30000);
+  </script>
+</body>
+</html>
